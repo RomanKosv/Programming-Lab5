@@ -1,0 +1,11 @@
+/.gitignore
+/.vs
+
+#for programming: Lab4
+/Lab4/obj/
+/Lab4/bin/
+
+#for tbi: Lab1
+/Lab1/x64/
+/Lab1/Lab1/x64
+/Lab1/.vs/
