@@ -1,5 +1,6 @@
 /.gitignore
 /.vs
+/Version independent files
 
 #for programming: Lab4
 /Lab4/obj/
