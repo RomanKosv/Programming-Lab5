@@ -1,8 +1,10 @@
 ﻿
 
 using System;
+using System.Collections;
 using System.Data;
 using System.Diagnostics.SymbolStore;
+using System.Formats.Asn1;
 using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -18,6 +20,9 @@ create-str для создания строки
 remove для удаления столбцов из двумерного массива
 add для добавления массива в начало зубчатого массива
 transform для переворота всех слов и сортировки слов в предложении
+print-matrix для печати матрицы
+print-arr для пучати зубчатого массива
+print-str для печати строки
 stop для остановки программы
 """;
 
@@ -40,16 +45,21 @@ const string testStr = "Asdemwl ekrqklmk ermfkmkq!lr,el leml..me";
 bool isStoped = false;
 
 int[,]? matrix = null;
-List<int[]>? array = null;
+int[][]? array = null;
 string? str = null;
 
 void DisplayMatrix()
 {
+    if (matrix == null)
+    {
+        Console.WriteLine("Отсутствует");
+        return;
+    }
     for (int y = 0; y < matrix.GetLength(1); y++)
     {
         for (int x = 0; x < matrix.GetLength(0); x++)
         {
-            Console.Write($"{matrix[x,y]}\t");
+            Console.Write($"{matrix[x, y]}\t");
         }
         Console.WriteLine();
     }
@@ -100,14 +110,13 @@ while (!isStoped)
                 {
 
                     if (
-                        (height >= 0) 
+                        (height >= 0)
                         && (
-                            ((width == 0) && (height <=Array.MaxLength)) 
-                            || ((width !=0) && (height <= Array.MaxLength/width))
+                            ((width == 0) && (height <= Array.MaxLength))
+                            || ((width != 0) && (height <= Array.MaxLength / width))
                         )
                     )
-                    { 
-                        Console.WriteLine(height * width);
+                    {
                         stopInp = true;
                     }
                     else
@@ -127,8 +136,22 @@ while (!isStoped)
                 }
             }
             matrix = new int[width, height];
-        restart_create_matr: Console.WriteLine("Введите режим создания массива или help:");
-            switch (Console.ReadLine())
+            Console.WriteLine("Введите режим создания массива иди help:");
+            ChainInput(
+                out string method,
+                Console.ReadLine,
+                [
+                    (
+                        (command) => command != "help",
+                        createArrHelp+"\nВведите режим создания массива иди help:"
+                    ),
+                    (
+                        (command) => command == "random" || command == "input",
+                        "Нет такой команды."
+                    )
+                ]
+            );
+            switch (method)
             {
                 case "input":
                     for (int x = 0; x < width; x++)
@@ -164,12 +187,6 @@ while (!isStoped)
                         }
                     }
                     break;
-                case "help":
-                    Console.WriteLine(createArrHelp);
-                    break;
-                default:
-                    Console.WriteLine("Нет такой команды.");
-                    goto restart_create_matr;
             }
             if (width * height == 0)
             {
@@ -183,48 +200,60 @@ while (!isStoped)
             break;
         case "create-arr":
             Console.Write("Введите длину массива:");
-            stopInp = false;
             int lenght = 0;
-            while (!stopInp)
-            {
-                if (int.TryParse(Console.ReadLine(), out lenght) && (lenght >= 0))
-                {
-                    stopInp = true;
-                }
-                else
-                {
-                    Console.Write("""
-                    Длина массива должнв быть целым неотрицательным числом
-                    Введите ее заново:
-                    """);
-                }
-            }
-        restart_create_arr:
+            ChainInput(
+                out string strLen,
+                Console.ReadLine,
+                [
+                    (
+                        (strLen) => int.TryParse(strLen,out lenght),
+                        """
+                        Длина массива должна быть целым числом.
+                        Введите ее заново:
+                        """
+                    ),
+                    (
+                        (strLen) => (lenght>=0) && (lenght <Array.MaxLength),
+                        $"""
+                        Длина массива должна бытьь числом от 0 до {Array.MaxLength}
+                        Введите ее заново:
+                        """
+                    )
+                ]
+            );
             Console.WriteLine("Введите режим создания массива иди help:");
-            switch (Console.ReadLine())
+            ChainInput(
+                out method,
+                Console.ReadLine,
+                [
+                    (
+                        (command) => command != "help",
+                        createArrHelp+"\nВведите режим создания массива иди help:"
+                    ),
+                    (
+                        (command) => command == "random" || command == "input",
+                        "Нет такой команды."
+                    )
+                ]
+            );
+            switch (method)
             {
-                case "help":
-                    Console.WriteLine(createArrHelp);
-                    goto restart_create_arr;
                 case "random":
-                    array = new List<int[]>();
+                    array = new int[lenght][];
                     for (int i = 0; i < lenght; i++)
                     {
-                        array.Add(RandomLine(array));
+                        array[i] = RandomLine();
                     }
                     break;
                 case "input":
-                    array = new List<int[]>();
+                    array = new int[lenght][];
                     for (int i = 0; i < lenght; i++)
                     {
-                        array.Add(InputLine());
+                        array[i] = InputLine();
                     }
                     break;
-                default:
-                    Console.WriteLine("Нет такой команды.");
-                    goto restart_create_arr;
             }
-            if (array.Count == 0)
+            if (array.Length == 0)
             {
                 Console.WriteLine("Создан пусой массив");
             }
@@ -237,11 +266,22 @@ while (!isStoped)
         case "create-str":
         restart_create_str:
             Console.WriteLine("Введите режим создания строки или help:");
-            switch (Console.ReadLine())
+            ChainInput(
+                out method,
+                Console.ReadLine,
+                [
+                    (
+                        (str) => str!="help",
+                        createStrHelp+"\nВведите режим создания строки или help:"
+                    ),
+                    (
+                        (str) => str == "input" || str == "test",
+                        "Нет такой команды."
+                    )
+                ]
+            );
+            switch (method)
             {
-                case "help":
-                    Console.WriteLine(createStrHelp);
-                    goto restart_create_str;
                 case "input":
                     Console.Write("Введите строку:");
                     str = Console.ReadLine();
@@ -249,52 +289,49 @@ while (!isStoped)
                 case "test":
                     str = testStr;
                     break;
-                default:
-                    Console.WriteLine("Нет такой команды.");
-                    goto restart_create_str;
             }
             Console.WriteLine("Создана строка:");
             Console.WriteLine(str);
             break;
         case "remove":
-            if (matrix != null)
+            if (matrix != null && matrix.GetLength(0) == 0)
+            {
+                Console.WriteLine("Ширина столбца должна быть более 0");
+            }
+            else if (matrix != null)
             {
                 int k1 = 0;
                 bool restart;
-                do
-                {
-                    Console.Write("Введите первый столбец:");
-                    if (int.TryParse(Console.ReadLine(), out k1) && (k1 > 0) && (k1 <= matrix.GetLength(0)))
-                    {
-                        restart = false;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Номер стлбца должен быть целым числом от 0 до {matrix.GetLength(0)}.");
-                        restart = true;
-                    }
-                } while (restart);
+                Console.WriteLine("Введите номер первого столбца");
+                ChainInput(
+                    out string strK1,
+                    Console.ReadLine,
+                    [
+                        (
+                            (str) => int.TryParse(str, out k1) && (k1 > 0) && (k1 <= matrix.GetLength(0)),
+                            $"Номер стлбца должен быть целым числом от 1 до {matrix.GetLength(0)}."
+                        )
+                    ]
+                );
+                Console.WriteLine("Введите номер последнего столбца");
                 int k2 = 0;
-                do
-                {
-                    Console.Write("Введите первый столбец:");
-                    if (int.TryParse(Console.ReadLine(), out k2) && (k2 >= k1) && (k2 <= matrix.GetLength(0)))
-                    {
-                        restart = false;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Номер стлбца должен быть целым числом от {k1} до {matrix.GetLength(0)}.");
-                        restart = true;
-                    }
-                } while (restart);
+                ChainInput(
+                    out string strK2,
+                    Console.ReadLine,
+                    [
+                        (
+                            (str) => int.TryParse(str, out k2) && (k2 >= k1) && (k2 <= matrix.GetLength(0)),
+                            $"Номер стлбца должен быть целым числом от {k1} до {matrix.GetLength(0)}."
+                        )
+                    ]
+                );
                 k1--;
                 k2--;
                 int[,] new_matrix = new int[matrix.GetLength(0) - k2 + k1 - 1, matrix.GetLength(1)];
                 for (int j = 0; j < matrix.GetLength(1); j++)
                 {
                     for (int i = 0; i < k1; i++) new_matrix[i, j] = matrix[i, j];
-                    for (int i = k2 + 1; i < matrix.GetLength(0); i++) new_matrix[i, j] = matrix[i, j];
+                    for (int i = k2 + 1; i < matrix.GetLength(0); i++) new_matrix[i - k2 + k1 - 1, j] = matrix[i, j];
                 }
                 matrix = new_matrix;
                 if (matrix.Length == 0)
@@ -330,7 +367,7 @@ while (!isStoped)
                         ),
                         (
                             (str) => (0<len) && (len < Array.MaxLength),
-                            """
+                            $"""
                             Длина доллжна быть числом от 0 до {Array.MaxLength}
                             """
                         )
@@ -360,7 +397,13 @@ while (!isStoped)
                         )
                     ]
                 );
-                array = new List<int[]>(array.Prepend(newRow));
+                int[][] newArray = new int[array.Length + 1][];
+                newArray[0] = newRow;
+                for (int i = 0; i < array.Length; i++)
+                {
+                    newArray[i + 1] = array[i];
+                }
+                array = newArray;
                 Console.WriteLine("Измененный массив:");
                 DisplayArray();
             }
@@ -372,17 +415,18 @@ while (!isStoped)
                 Regex regex = new Regex(@"(.*?(?:\.|!|\?))");
                 var sentences = regex.Matches(str);
                 List<string> strSent = new List<string>(MyMap<string, Match>(sentences, (a, i) => a.ToString()));
-                Console.WriteLine(strSent.First());
-                for(int i = 0; i<strSent.Count();i++){
-                    IEnumerable<string> words=Sort(
-                        MyMap<string,Match>(
+                for (int i = 0; i < strSent.Count(); i++)
+                {
+                    IEnumerable<string> words = Sort(
+                        MyMap<string, Match>(
                             new Regex(@"\w+").Matches(strSent[i]),
-                            (s,i) => JoinCh(Sort<char>(s.ToString(),(a,b)=>a<=b))
+                            (s, i) => JoinCh(Sort<char>(s.ToString(), (a, b) => a <= b))
                         ),
-                        (a,b) => a.Length<=b.Length
+                        (a, b) => a.Length <= b.Length
                     );
-                    var enumer=words.GetEnumerator();
-                    strSent[i]=Regex.Replace(strSent[i], @"\w+", (match)=>{
+                    var enumer = words.GetEnumerator();
+                    strSent[i] = Regex.Replace(strSent[i], @"\w+", (match) =>
+                    {
                         enumer.MoveNext();
                         return enumer.Current;
                     });
@@ -397,7 +441,31 @@ while (!isStoped)
             else Console.WriteLine("Строка должна быть инициализирована");
             break;
         case "stop":
-            isStoped=true;
+            isStoped = true;
+            break;
+        case "print-str":
+            Console.WriteLine("Текущая строка:");
+            if (str == null) Console.WriteLine("Отсутствует");
+            else Console.WriteLine(str);
+            break;
+        case "print-arr":
+            if (array!=null && array.Length == 0) Console.WriteLine("Текущий массив пуст");
+            else
+            {
+                Console.WriteLine("Текущий массив:");
+                DisplayArray();
+            }
+            break;
+        case "print-matrix":
+            if (matrix == null || matrix.Length != 0)
+            {
+                Console.WriteLine($"Текущая матрица:");
+                DisplayMatrix();
+            }
+            else
+            {
+                Console.WriteLine($"Текущая матрица пуста");
+            }
             break;
         default:
             Console.WriteLine("Нет такой команды");
@@ -405,7 +473,7 @@ while (!isStoped)
     }
 }
 
-int[] RandomLine(List<int[]>? array)
+int[] RandomLine()
 {
     int len = GetLength();
     int[] line = new int[len];
@@ -418,7 +486,7 @@ int[] RandomLine(List<int[]>? array)
 
 int[] InputLine()
 {
-    string[] splt = Console.ReadLine().Split(" ");
+    string[] splt = Console.ReadLine().Split(" ", StringSplitOptions.RemoveEmptyEntries);
     int[] rez = new int[splt.Length];
     for (int i = 0; i < splt.Length; i++)
     {
@@ -455,6 +523,11 @@ int GetLength()
 
 void DisplayArray()
 {
+    if (array == null)
+    {
+        Console.WriteLine("Отсутствует");
+        return;
+    }
     foreach (int[] line in array)
     {
         foreach (int element in line)
@@ -467,7 +540,6 @@ void DisplayArray()
 
 void ChainInput<T>(out T rez, Func<T> inputF, IEnumerable<(Predicate<T>, string)> checkChain)
 {
-    bool isStoped = false;
     rez = inputF();
     foreach (var (checker, message) in checkChain)
     {
@@ -491,7 +563,7 @@ IEnumerable<Out> MyMap<Out, In>(
         yield return fun(enumer.Current, i);
     }
 }
-IEnumerable<T> Sort<T>(IEnumerable<T> str, Func<T,T,bool> func) where T : IComparable<T>
+IEnumerable<T> Sort<T>(IEnumerable<T> str, Func<T, T, bool> func) where T : IComparable<T>
 {
     if (!str.GetEnumerator().MoveNext()) return str;
     T comparer = str.First();
@@ -500,15 +572,15 @@ IEnumerable<T> Sort<T>(IEnumerable<T> str, Func<T,T,bool> func) where T : ICompa
     s2 = new List<T>();
     foreach (T sym in str.Skip(1))
     {
-        if (func(sym,comparer)) s1.Add(sym);
+        if (func(sym, comparer)) s1.Add(sym);
         else s2.Add(sym);
     }
-    return Sort(s1,func).Append(comparer).Concat(Sort(s2,func));
+    return Sort(s1, func).Append(comparer).Concat(Sort(s2, func));
 }
 
 string Join(IEnumerable<string> strs)
 {
-    return strs.Aggregate((a, b) => a + b);
+    return strs.Aggregate("", (a, b) => a + b);
 }
 
 string JoinCh(IEnumerable<char> strs)
