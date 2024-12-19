@@ -1,7 +1,11 @@
 ﻿
 
+using System;
+using System.Data;
+using System.Diagnostics.SymbolStore;
 using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 Random random = new Random(DateTime.Now.Nanosecond);
 
@@ -354,8 +358,28 @@ while (!isStoped)
         case "transform":
             if (str != null)
             {
-                str.Split()
+                Regex regex = new Regex(@"(.*?(?:\.|!|\?))");
+                var sentences = regex.Matches(str);
+                IEnumerable<string> strSent = MyMap<string, Match>(sentences, (a, i) => a.ToString());
+                str = Join(
+                    MyMap<string, string>(
+                        strSent,
+                        (str, i) => Join(
+                            MyMap<string, Match>(
+                                new Regex(@"\w+|\W").Matches(str),
+                                (match, i) => JoinCh(Sort(match.ToString()))
+                            )
+                        )
+                    )
+                );
+                Console.WriteLine("Измененная строка:");
+                Console.WriteLine(str);
             }
+            else Console.WriteLine("Строка должна быть инициализирована");
+            break;
+        case "stop":
+            isStoped=true;
+            break;
     }
 }
 
@@ -445,14 +469,27 @@ IEnumerable<Out> MyMap<Out, In>(
         yield return fun(enumer.Current, i);
     }
 }
-string Sort(string str){
-    if (str == "") return "";
-    char comparer = str.First();
-    string s1,s2;
-    s1=s2="";
-    foreach (char sym in str.Skip(1)) {
-        if (sym < comparer) s1+=sym;
-        else s2+=sym;
+IEnumerable<T> Sort<T>(IEnumerable<T> str) where T : IComparable<T>
+{
+    if (!str.GetEnumerator().MoveNext()) return str;
+    T comparer = str.First();
+    List<T> s1, s2;
+    s1 = new List<T>();
+    s2 = new List<T>();
+    foreach (T sym in str.Skip(1))
+    {
+        if (sym.CompareTo(comparer) < 0) s1.Add(sym);
+        else s2.Add(sym);
     }
-    return Sort(s1)+comparer+Sort(s2);
+    return Sort(s1).Append(comparer).Concat(s2);
+}
+
+string Join(IEnumerable<string> strs)
+{
+    return strs.Aggregate((a, b) => a + b);
+}
+
+string JoinCh(IEnumerable<char> strs)
+{
+    return Join(MyMap<string, char>(strs, (ch, i) => ch.ToString()));
 }
