@@ -45,11 +45,11 @@ string? str = null;
 
 void DisplayMatrix()
 {
-    for (int y = 0; y < matrix.GetLength(0); y++)
+    for (int y = 0; y < matrix.GetLength(1); y++)
     {
-        for (int x = 0; x < matrix.GetLength(1); x++)
+        for (int x = 0; x < matrix.GetLength(0); x++)
         {
-            Console.Write($"{x} ");
+            Console.Write($"{matrix[x,y]}\t");
         }
         Console.WriteLine();
     }
@@ -57,6 +57,7 @@ void DisplayMatrix()
 
 while (!isStoped)
 {
+    Console.WriteLine("Введите команду или help для вывода инструкции:");
     switch (Console.ReadLine())
     {
         case "help":
@@ -92,18 +93,27 @@ while (!isStoped)
             }
             int height = 0;
             stopInp = false;
+            Console.Write("Введте высоту массива:");
             while (!stopInp)
             {
                 if (int.TryParse(Console.ReadLine(), out height))
                 {
-                    if ((height >= 0) && (height * width <= Array.MaxLength))
-                    {
+
+                    if (
+                        (height >= 0) 
+                        && (
+                            ((width == 0) && (height <=Array.MaxLength)) 
+                            || ((width !=0) && (height <= Array.MaxLength/width))
+                        )
+                    )
+                    { 
+                        Console.WriteLine(height * width);
                         stopInp = true;
                     }
                     else
                     {
                         Console.Write($"""
-                        Высота массива дожна быть целым неотрицательным числом объем массива не должен превышать {Array.MaxLength}.
+                        Высота массива дожна быть целым неотрицательным числом рузмер массива не должен превышать {Array.MaxLength}.
                         Введте высоту массива:
                         """);
                     }
@@ -163,11 +173,11 @@ while (!isStoped)
             }
             if (width * height == 0)
             {
-                Console.WriteLine("Создан пусой массив");
+                Console.WriteLine($"Создан пусой массив {width}x{height}");
             }
             else
             {
-                Console.WriteLine("Создан массив:");
+                Console.WriteLine($"Создан массив {width}x{height}:");
                 DisplayMatrix();
             }
             break;
@@ -306,6 +316,7 @@ while (!isStoped)
             if (array != null)
             {
                 int len = 0;
+                Console.Write("Введите длину:");
                 ChainInput(
                     out string inpt,
                     Console.ReadLine,
@@ -360,17 +371,25 @@ while (!isStoped)
             {
                 Regex regex = new Regex(@"(.*?(?:\.|!|\?))");
                 var sentences = regex.Matches(str);
-                IEnumerable<string> strSent = MyMap<string, Match>(sentences, (a, i) => a.ToString());
+                List<string> strSent = new List<string>(MyMap<string, Match>(sentences, (a, i) => a.ToString()));
+                Console.WriteLine(strSent.First());
+                for(int i = 0; i<strSent.Count();i++){
+                    IEnumerable<string> words=Sort(
+                        MyMap<string,Match>(
+                            new Regex(@"\w+").Matches(strSent[i]),
+                            (s,i) => JoinCh(Sort<char>(s.ToString(),(a,b)=>a<=b))
+                        ),
+                        (a,b) => a.Length<=b.Length
+                    );
+                    var enumer=words.GetEnumerator();
+                    strSent[i]=Regex.Replace(strSent[i], @"\w+", (match)=>{
+                        enumer.MoveNext();
+                        return enumer.Current;
+                    });
+                }
+
                 str = Join(
-                    MyMap<string, string>(
-                        strSent,
-                        (str, i) => Join(
-                            MyMap<string, Match>(
-                                new Regex(@"\w+|\W").Matches(str),
-                                (match, i) => JoinCh(Sort(match.ToString()))
-                            )
-                        )
-                    )
+                    strSent
                 );
                 Console.WriteLine("Измененная строка:");
                 Console.WriteLine(str);
@@ -379,6 +398,9 @@ while (!isStoped)
             break;
         case "stop":
             isStoped=true;
+            break;
+        default:
+            Console.WriteLine("Нет такой команды");
             break;
     }
 }
@@ -417,14 +439,14 @@ int GetLength()
     Console.Write("Введите длину внутреннего массива:");
     while (true)
     {
-        if (int.TryParse(Console.ReadLine(), out int len))
+        if (int.TryParse(Console.ReadLine(), out int len) && len >= 0 && len <= Array.MaxLength)
         {
             return len;
         }
         else
         {
-            Console.WriteLine("""
-                                Длина массива должна быть целым неотрицательным числом
+            Console.WriteLine($"""
+                                Длина массива должна быть целым неотрицательным числом не более {Array.MaxLength}
                                 Введите ее заново:
                                 """);
         }
@@ -469,7 +491,7 @@ IEnumerable<Out> MyMap<Out, In>(
         yield return fun(enumer.Current, i);
     }
 }
-IEnumerable<T> Sort<T>(IEnumerable<T> str) where T : IComparable<T>
+IEnumerable<T> Sort<T>(IEnumerable<T> str, Func<T,T,bool> func) where T : IComparable<T>
 {
     if (!str.GetEnumerator().MoveNext()) return str;
     T comparer = str.First();
@@ -478,10 +500,10 @@ IEnumerable<T> Sort<T>(IEnumerable<T> str) where T : IComparable<T>
     s2 = new List<T>();
     foreach (T sym in str.Skip(1))
     {
-        if (sym.CompareTo(comparer) < 0) s1.Add(sym);
+        if (func(sym,comparer)) s1.Add(sym);
         else s2.Add(sym);
     }
-    return Sort(s1).Append(comparer).Concat(s2);
+    return Sort(s1,func).Append(comparer).Concat(Sort(s2,func));
 }
 
 string Join(IEnumerable<string> strs)
